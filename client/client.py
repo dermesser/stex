@@ -177,7 +177,7 @@ class Depot(core.QObject):
         return value
 
     def to_dict(self):
-        s = {'cash': self.cash, 'stock': {}, '_stockdepot': True}
+        s = {'cash': self.cash, 'value': self.total_value(), 'stock': {}, '_stockdepot': True}
         for sym, stock in self.stock.items():
             stock_sum = {'num': stock.current_num}
             s['stock'][sym] = stock_sum
@@ -305,9 +305,9 @@ class StockWidget(wid.QWidget):
         self.depotstock = depotstock
         self.sym = self.depotstock.sym
 
-        mainvbox = wid.QVBoxLayout(self)
-        mainvbox.addWidget(self.graph)
-        mainvbox.addLayout(self.init_buttonbox())
+        stocksvbox = wid.QVBoxLayout(self)
+        stocksvbox.addWidget(self.graph)
+        stocksvbox.addLayout(self.init_buttonbox())
 
     def init_buttonbox(self):
         buy = wid.QPushButton('  BUY   ')
@@ -428,6 +428,8 @@ class CallbackSocket(core.QObject):
     waiting = False
     queue = []
 
+    newGroupInfo = core.pyqtSignal(dict)
+
     def __init__(self, zctx, creds):
         super().__init__()
         self.creds = creds
@@ -485,6 +487,9 @@ class CallbackSocket(core.QObject):
             print('DEBUG: Received response: {}'.format(msg))
             self.waiting = False
 
+            if '_stockresp' in msg and 'groupinfo' in msg:
+                self.newGroupInfo.emit(msg['groupinfo'])
+
             # Try sending oldest message.
             if len(self.queue) > 0:
                 self.try_send(self.queue.pop(0))
@@ -528,17 +533,45 @@ class Client(arguments.BaseArguments, wid.QWidget):
     def set_creds(self, creds):
         self.creds = creds
 
+    mainhbox = None
+    stocksvbox = None
+    stockrows = []
+    widgets_per_hbox = 2
+
+    group_members_max = 12
+    group_table = None
+
+    def add_stock_widget(self, sw):
+        if len(self.stockrows) == 0 or self.stockrows[-1].count() >= self.widgets_per_hbox:
+            hbox = wid.QHBoxLayout()
+            hbox.addWidget(sw)
+            self.stockrows.append(hbox)
+            self.stocksvbox.addLayout(hbox)
+        else:
+            self.stockrows[-1].addWidget(sw)
+        return
+
     def start_wait_window(self):
-        self.mainvbox = wid.QVBoxLayout(self)
+        self.mainhbox = wid.QHBoxLayout(self)
+
+        self.stocksvbox = wid.QVBoxLayout(self)
         self.waiting = wid.QLabel("Waiting for incoming stock data - hang tight!", self)
-        self.mainvbox.addWidget(self.depot_widget)
-        self.mainvbox.addWidget(self.waiting)
+        self.stocksvbox.addWidget(self.depot_widget)
+        self.stocksvbox.addWidget(self.waiting)
         self.show()
+
+        self.group_table = wid.QTableWidget(self.group_members_max, 2, self)
+        self.group_table.setBaseSize(100, 400)
+        self.group_table.show()
+
+        self.mainhbox.addLayout(self.stocksvbox)
+        self.mainhbox.addWidget(self.group_table)
 
         self.sock = ClientSocket(self.zctx, self.creds)
         self.sock.on_new_message.connect(self.on_new_data)
         self.callback_sock = CallbackSocket(self.zctx, self.creds)
         self.callback_sock.login()
+        self.callback_sock.newGroupInfo.connect(self.on_new_group_info)
 
     stock_widgets = {}
 
@@ -559,26 +592,27 @@ class Client(arguments.BaseArguments, wid.QWidget):
                 self.depot.add_stock(sym, depotstock)
                 self.depot.priceUpdated.connect(sw.update)
 
+    @core.pyqtSlot(dict)
+    def on_new_group_info(self, groupinfo):
+        """Updates leader-board table."""
+        members = groupinfo.items()
+        members = sorted(members, key=lambda i: i[1].get('value', -1))
+        self.group_table.clear()
+        i = 0
+        for (member, info) in members:
+            if i >= self.group_table.rowCount():
+                break
+            value = info['value'] / 100 if 'value' in info else -1
+            self.group_table.setItem(i, 0, wid.QTableWidgetItem(member))
+            self.group_table.setItem(i, 1, wid.QTableWidgetItem('{} ø'.format(value)))
+
+
     @core.pyqtSlot()
     def on_periodic_timer(self):
         print('DEBUG: timer expired!')
         if not self.callback_sock:
             return
         self.callback_sock.send_depot(self.depot)
-    
-    mainvbox = None
-    hboxes = []
-    widgets_per_hbox = 2
-
-    def add_stock_widget(self, sw):
-        if len(self.hboxes) == 0 or self.hboxes[-1].count() >= self.widgets_per_hbox:
-            hbox = wid.QHBoxLayout()
-            hbox.addWidget(sw)
-            self.hboxes.append(hbox)
-            self.mainvbox.addLayout(hbox)
-        else:
-            self.hboxes[-1].addWidget(sw)
-        return
 
 
 def main():

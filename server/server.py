@@ -198,7 +198,8 @@ class Server(arguments.BaseArguments):
                     print ('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
 
                     custom_msg = msg.get('msg', '')
-                    _groups.update(msg.get('group', None), msg.get('user', None), {'cash': custom_msg.get('cash', 0)})
+                    groupinfo = {'cash': custom_msg.get('cash', -1), 'value': custom_msg.get('value', -1)}
+                    _groups.update(msg.get('group', None), msg.get('user', None), groupinfo)
                     resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
                     sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
                 except Exception as e:
