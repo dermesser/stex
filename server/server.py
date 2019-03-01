@@ -12,8 +12,7 @@ from PyQt5.QtGui import QIcon
 
 import zmq
 
-_random = random.Random()
-_random.seed(1)
+_random = random.SystemRandom()
 # Maximum initial stock value in cents.
 _maxinitvalue = 10000
 _splitvalue = 20000
@@ -197,13 +196,13 @@ class Server(arguments.BaseArguments):
                     assert len(msgs) > 2
                     msg = json.loads(msgs[2].decode())
                     print ('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
-                    _groups.update(msg.get('group', None), msg.get('user', None), msg.get('msg', {}))
+
+                    custom_msg = msg.get('msg', '')
+                    _groups.update(msg.get('group', None), msg.get('user', None), {'cash': custom_msg.get('cash', 0)})
                     resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
                     sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
                 except Exception as e:
-                    print(e)
                     raise e
-
 
 def main():
         ctx = zmq.Context()
