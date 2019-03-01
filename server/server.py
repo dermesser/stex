@@ -16,6 +16,7 @@ _random = random.Random()
 _random.seed(1)
 # Maximum initial stock value in cents.
 _maxinitvalue = 10000
+_splitvalue = 20000
 _maxhistory = 100
 
 class Stock:
@@ -37,15 +38,22 @@ class Stock:
         self._current_value = _random.random() * _maxinitvalue
 
     def next_price(self):
-        """Calculates a (random) next price based on the current price and history."""
+        """Calculates a (random) next price based on the current price and history. Returns a dict suitable for inclusion in a _stockdata object."""
         dev = 0.02*self._current_value or 1
         new_value = int(_random.normalvariate(self._current_value * 1.001, dev))
         new_value = abs(new_value)
+        split = False
+
+        if new_value > _splitvalue:
+            new_value = new_value / 2
+            split = True
+
         self._last_values.append(self._current_value)
         self._current_value = new_value
         if len(self._last_values) > _maxhistory:
             self._last_values = self._last_values[1:]
-        return new_value
+
+        return {'price': new_value, 'split': split, '_stockupdate': True}
 
     def current_value(self):
         return self._current_value
@@ -83,7 +91,8 @@ class Stocks:
     def generate(self):
         next = {}
         for s in self._stocks:
-            next[s.symbol] = s.next_price()
+            nextprice = s.next_price()
+            next[s.symbol] = nextprice
         return StockData(next)
 
 
