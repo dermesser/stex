@@ -6,9 +6,6 @@ import json
 import random
 import sys
 import time
-    
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton
-from PyQt5.QtGui import QIcon
 
 import zmq
 
