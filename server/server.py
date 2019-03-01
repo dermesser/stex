@@ -177,7 +177,7 @@ class Server(arguments.BaseArguments):
                 if len(events) > 0:
                     self.handle_calls(events)
                     diff = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) - before) / 1e6
-                    remaining = interval - diff
+                    remaining = nextinterval - diff
                     nextinterval = remaining if remaining > 0 else 0
                 else:  # Timeout
                     nextdata = self._stocks.generate()
