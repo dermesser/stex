@@ -236,7 +236,6 @@ class StockGraph(chart.QChartView):
 
     def __init__(self, sym, dim):
         super().__init__()
-        super().setMinimumSize(500, 300)
         self.sym = sym
         self.series = chart.QLineSeries(self)
         self.avg_buy_series = chart.QLineSeries(self)
@@ -304,6 +303,8 @@ class StockWidget(wid.QWidget):
         self.depot = depot
         self.depotstock = depotstock
         self.sym = self.depotstock.sym
+
+        self.graph.setMinimumSize(300, 250)
 
         stocksvbox = wid.QVBoxLayout(self)
         stocksvbox.addWidget(self.graph)
@@ -515,6 +516,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
 
     def __init__(self):
         super(wid.QWidget, self).__init__()
+        wid.QWidget.setMinimumSize(self, 1000, 700)
         super(arguments.BaseArguments, self).__init__(doc=self._doc)
 
         self.depot_widget = DepotWidget(self.depot)
@@ -561,7 +563,8 @@ class Client(arguments.BaseArguments, wid.QWidget):
         self.show()
 
         self.group_table = wid.QTableWidget(self.group_members_max, 2, self)
-        self.group_table.setMaximumWidth(250)
+        self.group_table.setMinimumWidth(210)
+        self.group_table.setMaximumWidth(210)
         self.group_table.show()
 
         self.mainhbox.addLayout(self.stocksvbox)
