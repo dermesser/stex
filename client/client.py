@@ -10,10 +10,12 @@ import PyQt5.QtWidgets as wid
 import PyQt5.QtCore as core
 import PyQt5.QtChart as chart
 
+
 class Creds:
     user = ''
     password = ''
     addr = ''
+
 
 class ClientConfigDialog(wid.QDialog):
     addr = None
@@ -125,9 +127,8 @@ class Depot(core.QObject):
         assert price > 0
         if price * num > self.cash:
             return False
-        self.cash -= price*num
+        self.cash -= price * num
         stock.current_num += num
-        self.priceUpdated.emit(stocksym)
         return True
 
     def sell(self, stocksym, num):
@@ -138,7 +139,7 @@ class Depot(core.QObject):
         assert price > 0
         if num > stock.current_num:
             return False
-        self.cash += price*num
+        self.cash += price * num
         stock.current_num -= num
         return True
 
@@ -178,6 +179,7 @@ class DepotStock:
         if upd['split']:
             self.current_num = self.current_num * 2
 
+
 class StockGraph(chart.QChartView):
     sym = ''
 
@@ -191,7 +193,7 @@ class StockGraph(chart.QChartView):
 
     def __init__(self, sym, dim):
         super().__init__()
-        super().setMinimumSize(300,200)
+        super().setMinimumSize(300, 200)
         self.sym = sym
         self.series = chart.QLineSeries(self)
         for x in self.XAXIS:
@@ -208,7 +210,7 @@ class StockGraph(chart.QChartView):
         if value > self.max:
             self.max = value
 
-        previous, nxt = (self.current-1)%self.MAX_LEN, (self.current+1)%self.MAX_LEN
+        previous, nxt = (self.current - 1) % self.MAX_LEN, (self.current + 1) % self.MAX_LEN
         # Shift graph to the left
         self.series.replace(self.current, self.current, value)
         self.series.replace(nxt, nxt, 0)
@@ -222,6 +224,7 @@ class StockGraph(chart.QChartView):
         super().chart().removeSeries(super().chart().series()[0])
         super().chart().addSeries(self.series)
         super().chart().createDefaultAxes()
+
 
 class StockWidget(wid.QWidget):
     graph = None
@@ -258,12 +261,12 @@ class StockWidget(wid.QWidget):
     def on_buy(self):
         if not self.depot.buy(self.sym, 1):
             print("Warning: couldn't buy {}".format(self.depotstock.sym))
-        self.update(self.sym)
+        self.update_values()
 
     def on_sell(self):
         if not self.depot.sell(self.sym, 1):
             print("Warning: couldn't sell {}".format(self.depotstock.sym))
-        self.update(self.sym)
+        self.update_values()
 
     # Triggered by the depot when there is new data for any stock (so we filter if the update is for us)
     @core.pyqtSlot(str)
@@ -272,8 +275,11 @@ class StockWidget(wid.QWidget):
             return
         val = self.depotstock.current_price / 100
         self.graph.update_stock(val)
-        self.current_state.setText('{} pc / {:.2f} ø/pc / {:.2f} ø'.format(self.depotstock.current_num,
-                    val, self.depotstock.current_num*val))
+        self.update_values()
+
+    def update_values(self):
+        val = self.depotstock.current_price / 100
+        self.current_state.setText('{} pc / {:.2f} ø/pc / {:.2f} ø'.format(self.depotstock.current_num, val, self.depotstock.current_num * val))
 
 
 class DepotWidget(wid.QWidget):
@@ -297,10 +303,10 @@ class DepotWidget(wid.QWidget):
 
     @core.pyqtSlot(str)
     def on_depot_update(self, sym_):
-        stock = self.depot.total_value()/100
-        cash = self.depot.cash/100
-        self.depot_value_widget.setText(
-                '{:.2f} ø = {:.2f} ø (Cash) + {:.2f} ø (Stock)'.format(stock+cash, cash, stock))
+        stock = self.depot.total_value() / 100
+        cash = self.depot.cash / 100
+        self.depot_value_widget.setText('{:.2f} ø = {:.2f} ø (Cash) + {:.2f} ø (Stock)'.format(stock + cash, cash, stock))
+
 
 class ClientSocket(core.QObject):
     zctx = None
@@ -333,6 +339,7 @@ class ClientSocket(core.QObject):
                 self.on_new_message.emit(msg)
         except Exception:
             return
+
 
 class Client(arguments.BaseArguments, wid.QWidget):
     _doc = """
@@ -405,10 +412,12 @@ class Client(arguments.BaseArguments, wid.QWidget):
         self.mainvbox = wid.QVBoxLayout(self)
         self.show()
 
+
 def main():
     app = wid.QApplication(sys.argv)
     client = Client()
     sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
     main()
