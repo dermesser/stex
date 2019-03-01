@@ -245,19 +245,19 @@ class StockGraph(chart.QChartView):
     # update_stock sets a new stock price.
     def update_stock(self, value):
         """Update data series used for plotting graphs."""
-        min, max = 1e9, -1e9
+        mn, mx = 1e9, -1e9
         for v in self.series.pointsVector():
-            if v.y() < min:
-                min = v.y()
-            if v.y() > max:
-                max = v.y()
+            if v.y() < mn:
+                mn = v.y()
+            if v.y() > mx:
+                mx = v.y()
 
         previous, nxt = (self.current - 1) % self.MAX_LEN, (self.current + 1) % self.MAX_LEN
         self.series.replace(self.current, self.current, value)
 
         self.upd_series.clear()
         self.upd_series.append(self.current, 0)
-        self.upd_series.append(self.current, max)
+        self.upd_series.append(self.current, max(mx, self.avg_buy_price))
 
         self.avg_buy_series.clear()
         self.avg_buy_series.append(0, self.avg_buy_price)
