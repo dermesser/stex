@@ -19,6 +19,23 @@ _maxinitvalue = 10000
 _splitvalue = 20000
 _maxhistory = 100
 
+class Groups:
+    """Groups manages depot subscriptions for groups."""
+    groups = {}
+
+    def update(self, group, user, info):
+        """updates user info in a group. info is a dict containing the fields 'cash'."""
+        if not (group and user and info):
+            return
+        print('updated ', group, user, info)
+        self.groups[group] = {} if group not in self.groups else self.groups[group]
+        self.groups[group][user] = info
+
+    def get(self, group):
+        """gets a dict with 'user' -> {'depot': _} mapping."""
+        return self.groups.get(group, None)
+
+_groups = Groups()
 
 class Stock:
         symbol = ''
@@ -178,11 +195,14 @@ class Server(arguments.BaseArguments):
                 try:
                     msgs = sock.recv_multipart()
                     assert len(msgs) > 2
-                    print ('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), json.loads(msgs[2].decode())))
-                    resp = {'_stockresp': True, 'ok': True}
+                    msg = json.loads(msgs[2].decode())
+                    print ('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
+                    _groups.update(msg.get('group', None), msg.get('user', None), msg.get('msg', {}))
+                    resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
                     sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
                 except Exception as e:
                     print(e)
+                    raise e
 
 
 def main():

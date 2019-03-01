@@ -109,6 +109,7 @@ class ClientConfigDialog(wid.QDialog):
     def ok_clicked(self):
         self.save_default('addr', self.addr.text())
         self.save_default('user', self.user.text())
+        self.save_default('group', self.group.text())
         self.save_default('password', self.password.text())
         self.accepted.emit()
         self.finished.emit(1)
