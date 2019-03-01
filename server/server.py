@@ -166,24 +166,24 @@ class Server(arguments.BaseArguments):
 
         def run(self):
             interval = int(self.interval or 500)
-            newinterval = interval
+            nextinterval = interval
 
             p = zmq.Poller()
             p.register(self.interactivesocket, zmq.POLLIN)
             while True:
                 before = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
-                events = p.poll(newinterval)
+                events = p.poll(nextinterval)
 
                 if len(events) > 0:
                     self.handle_calls(events)
-                    diff = time.clock_gettime_ns(time.CLOCK_MONOTONIC) - before
-                    newinterval = interval - diff if diff < newinterval else interval
-                    newinterval /= 1e6
+                    diff = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) - before) / 1e6
+                    remaining = interval - diff
+                    nextinterval = remaining if remaining > 0 else 0
                 else:  # Timeout
                     nextdata = self._stocks.generate()
                     print("DEBUG: {}".format(nextdata))
                     self.pubsocket.send_string(nextdata.serialize())
-                    newinterval = interval
+                    nextinterval = interval
 
         # Handle callbacks from clients.
         def handle_calls(self, events):
