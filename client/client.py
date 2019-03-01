@@ -605,6 +605,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
             value = info['value'] / 100 if 'value' in info else -1
             self.group_table.setItem(i, 0, wid.QTableWidgetItem(member))
             self.group_table.setItem(i, 1, wid.QTableWidgetItem('{:.0f} ø'.format(value)))
+            i += 1
 
 
     @core.pyqtSlot()
