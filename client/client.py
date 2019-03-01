@@ -110,8 +110,9 @@ class ClientConfigDialog(wid.QDialog):
         creds.addr = self.addr.text()
         return creds
 
-# A Depot instance is shared by DepotStocks.
+
 class Depot(core.QObject):
+    """Depot contains several DepotStocks and manages buying/selling them."""
     cash = 0
     stock = {}
 
@@ -166,8 +167,10 @@ class Depot(core.QObject):
             s['stock'][sym] = stock_sum
         return json.dumps(s)
 
-# A stock position in a depot.
+
 class DepotStock:
+    """DepotStock is a position of stock in a single company in the depot. It
+    manages its own price and volume as well as some statistics."""
     sym = ''
     mydepot = None
 
@@ -181,6 +184,10 @@ class DepotStock:
         self.sym = sym
 
     def update(self, upd):
+        """Apply an update received from the stex server.
+
+        upd is a stock update message.
+        """
         if self.current_price >= 0:
             self.price_history.append(self.current_price)
             if len(self.price_history) > self.MAXHIST:
@@ -201,6 +208,9 @@ class DepotStock:
 
 
 class StockGraph(chart.QChartView):
+    """StockGraph is a stock price graph in the UI. Its knowledge of the stock is exclusively
+    updated by other objects like StockWidget."""
+
     sym = ''
     # Updated by StockWidget
     avg_buy_price = 0
@@ -232,7 +242,9 @@ class StockGraph(chart.QChartView):
         super().chart().addSeries(self.upd_series)
         super().chart().createDefaultAxes()
 
+    # update_stock sets a new stock price.
     def update_stock(self, value):
+        """Update data series used for plotting graphs."""
         min, max = 1e9, -1e9
         for v in self.series.pointsVector():
             if v.y() < min:
@@ -257,6 +269,7 @@ class StockGraph(chart.QChartView):
         self.plot()
 
     def plot(self):
+        """Updates the graph widget."""
         while super().chart().series():
             super().chart().removeSeries(super().chart().series()[0])
         super().chart().addSeries(self.upd_series)
@@ -266,6 +279,8 @@ class StockGraph(chart.QChartView):
 
 
 class StockWidget(wid.QWidget):
+    """StockWidget contains a stock price graph as well as buy/sell buttons and price indicators.
+    """
     graph = None
     depot = None
     sym = ''
@@ -381,8 +396,8 @@ class ClientSocket(core.QObject):
         except Exception as e:
             return
 
-# Manages communication back to the server, like depot settings etc.
 class CallbackSocket(core.QObject):
+    """CallbackSocket sends messages to the stex server and receives responses."""
     creds = None
     socket = None
     waiting = False
