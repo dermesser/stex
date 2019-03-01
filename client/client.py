@@ -129,6 +129,7 @@ class Depot(core.QObject):
     stock = {}
 
     priceUpdated = core.pyqtSignal(str)
+    depotChanged = core.pyqtSignal()
 
     def add_stock(self, stocksym, stock):
         if stocksym not in self.stock:
@@ -142,9 +143,10 @@ class Depot(core.QObject):
         if price == 0:
             price = 1
         if price * num > self.cash:
-            return False
+            num = int(self.cash / price)
         self.cash -= price * num
         stock.change_hold(num)
+        self.depotChanged.emit()
         return True
 
     def sell(self, stocksym, num):
@@ -153,9 +155,10 @@ class Depot(core.QObject):
         stock = self.stock[stocksym]
         price = stock.current_price
         if num > stock.current_num:
-            return False
+            num = stock.current_num
         self.cash += price * num
         stock.change_hold(-num)
+        self.depotChanged.emit()
         return True
 
     def update(self, message):
@@ -165,6 +168,7 @@ class Depot(core.QObject):
             if sym in self.stock:
                 self.stock[sym].update(upd)
                 self.priceUpdated.emit(sym)
+                self.depotChanged.emit()
 
     def total_value(self):
         value = 0
@@ -172,25 +176,22 @@ class Depot(core.QObject):
             value += stock.current_num * stock.current_price
         return value
 
-    def serialize(self):
+    def to_dict(self):
         s = {'cash': self.cash, 'stock': {}, '_stockdepot': True}
         for sym, stock in self.stock.items():
             stock_sum = {'num': stock.current_num}
             s['stock'][sym] = stock_sum
-        return json.dumps(s)
+        return s
 
 
 class DepotStock:
     """DepotStock is a position of stock in a single company in the depot. It
     manages its own price and volume as well as some statistics."""
     sym = ''
-    mydepot = None
 
     current_price = -1
     total_buy_price = 0
     current_num = 0
-    MAXHIST = 500
-    price_history = []
 
     def __init__(self, sym):
         self.sym = sym
@@ -200,20 +201,17 @@ class DepotStock:
 
         upd is a stock update message.
         """
-        if self.current_price >= 0:
-            self.price_history.append(self.current_price)
-            if len(self.price_history) > self.MAXHIST:
-                self.price_history = self.price_history[25:]
         self.current_price = upd['price']
         if upd['split']:
             self.current_num = self.current_num * 2
 
     def change_hold(self, diff):
-        self.current_num += diff
+        assert -diff <= self.current_num
         if diff > 0:
             self.total_buy_price += diff * self.current_price
         if diff < 0:
             self.total_buy_price += diff * self.avg_buy_price()
+        self.current_num += diff
 
     def avg_buy_price(self):
         return self.total_buy_price / (self.current_num or 1)
@@ -238,7 +236,7 @@ class StockGraph(chart.QChartView):
 
     def __init__(self, sym, dim):
         super().__init__()
-        super().setMinimumSize(300, 200)
+        super().setMinimumSize(300, 300)
         self.sym = sym
         self.series = chart.QLineSeries(self)
         self.avg_buy_series = chart.QLineSeries(self)
@@ -257,27 +255,29 @@ class StockGraph(chart.QChartView):
     # update_stock sets a new stock price.
     def update_stock(self, value):
         """Update data series used for plotting graphs."""
-        mn, mx = 1e9, -1e9
-        for v in self.series.pointsVector():
-            if v.y() < mn:
-                mn = v.y()
-            if v.y() > mx:
-                mx = v.y()
+        if value is not None:
+            mn, mx = 1e9, -1e9
+            for v in self.series.pointsVector():
+                if v.y() < mn:
+                    mn = v.y()
+                if v.y() > mx:
+                    mx = v.y()
 
-        previous, nxt = (self.current - 1) % self.MAX_LEN, (self.current + 1) % self.MAX_LEN
-        self.series.replace(self.current, self.current, value)
+            previous, nxt = (self.current - 1) % self.MAX_LEN, (self.current + 1) % self.MAX_LEN
+            self.series.replace(self.current, self.current, value)
 
-        self.upd_series.clear()
-        self.upd_series.append(self.current, 0)
-        self.upd_series.append(self.current, max(mx, self.avg_buy_price))
+            self.upd_series.clear()
+            self.upd_series.append(self.current, 0)
+            self.upd_series.append(self.current, max(mx, self.avg_buy_price))
+
+            self.current += 1
+            if self.current >= self.MAX_LEN:
+                self.current = 0
 
         self.avg_buy_series.clear()
         self.avg_buy_series.append(0, self.avg_buy_price)
         self.avg_buy_series.append(self.MAX_LEN - 1, self.avg_buy_price)
 
-        self.current += 1
-        if self.current >= self.MAX_LEN:
-            self.current = 0
         self.plot()
 
     def plot(self):
@@ -314,6 +314,15 @@ class StockWidget(wid.QWidget):
         buy.clicked.connect(self.on_buy)
         sell = wid.QPushButton('  SELL  ')
         sell.clicked.connect(self.on_sell)
+        quantity = wid.QSpinBox()
+        quantity.setMinimumSize(30, 30)
+        quantity.setMinimum(1)
+        quantity.setMaximum(1e5)
+        quantity.setAccelerated(True)
+        quantity.setSuffix(' pc')
+        quantity.setValue(10)
+        self.quantity_spinner = quantity
+
         self.current_state = wid.QLineEdit()
         self.current_state.setReadOnly(True)
         self.current_state.setAlignment(core.Qt.AlignCenter)
@@ -321,18 +330,21 @@ class StockWidget(wid.QWidget):
         hbox = wid.QHBoxLayout()
         hbox.addWidget(buy)
         hbox.addWidget(sell)
+        hbox.addWidget(self.quantity_spinner)
         hbox.addWidget(self.current_state)
         return hbox
 
     def on_buy(self):
-        if not self.depot.buy(self.sym, 1):
+        if not self.depot.buy(self.sym, self.quantity_spinner.value()):
             print("Warning: couldn't buy {}".format(self.depotstock.sym))
         self.update_values()
+        self.graph.update_stock(None)
 
     def on_sell(self):
-        if not self.depot.sell(self.sym, 1):
+        if not self.depot.sell(self.sym, self.quantity_spinner.value()):
             print("Warning: couldn't sell {}".format(self.depotstock.sym))
         self.update_values()
+        self.graph.update_stock(None)
 
     # Triggered by the depot when there is new data for any stock (so we filter if the update is for us)
     @core.pyqtSlot(str)
@@ -340,8 +352,8 @@ class StockWidget(wid.QWidget):
         if sym != self.sym:
             return
         val = self.depotstock.current_price / 100
-        self.graph.update_stock(val)
         self.update_values()
+        self.graph.update_stock(val)
 
     def update_values(self):
         val = self.depotstock.current_price / 100
@@ -357,7 +369,7 @@ class DepotWidget(wid.QWidget):
     def __init__(self, depot):
         super().__init__()
         self.depot = depot
-        self.depot.priceUpdated.connect(self.on_depot_update)
+        self.depot.depotChanged.connect(self.on_depot_update)
 
         self.hbox = wid.QHBoxLayout(self)
         self.depot_value_widget = wid.QLineEdit()
@@ -366,10 +378,10 @@ class DepotWidget(wid.QWidget):
         self.hbox.addWidget(wid.QLabel('Current Depot Value: '))
         self.hbox.addWidget(self.depot_value_widget)
 
-        self.on_depot_update('')
+        self.on_depot_update()
 
-    @core.pyqtSlot(str)
-    def on_depot_update(self, sym_):
+    @core.pyqtSlot()
+    def on_depot_update(self):
         stock = self.depot.total_value() / 100
         cash = self.depot.cash / 100
         self.depot_value_widget.setText('{:.2f} ø = {:.2f} ø (Cash) + {:.2f} ø (Stock)'.format(stock + cash, cash, stock))
@@ -408,6 +420,7 @@ class ClientSocket(core.QObject):
         except Exception as e:
             return
 
+
 class CallbackSocket(core.QObject):
     """CallbackSocket sends messages to the stex server and receives responses."""
     creds = None
@@ -437,8 +450,9 @@ class CallbackSocket(core.QObject):
         self.try_send({'_stocklogin': True})
 
     def send_depot(self, depot):
-        summary = depot.serialize()
-        self.try_send(summary)
+        summary = depot.to_dict()
+        if not self.try_send(summary):
+            self.queue.pop(0)
 
     def wrap(self, msg):
         return json.dumps({
@@ -457,10 +471,12 @@ class CallbackSocket(core.QObject):
             try:
                 self.socket.send_string(msg)
                 self.waiting = True
+                return True
             except Exception as e:
                 print ('DEBUG: Send failed on REQ socket: ', e)
                 self.queue.append(msg)
         assert len(self.queue) < 5
+        return False
 
     @core.pyqtSlot(int)
     def on_reply(self, _sock):
@@ -518,7 +534,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
         self.mainvbox.addWidget(self.depot_widget)
         self.mainvbox.addWidget(self.waiting)
         self.show()
-        
+
         self.sock = ClientSocket(self.zctx, self.creds)
         self.sock.on_new_message.connect(self.on_new_data)
         self.callback_sock = CallbackSocket(self.zctx, self.creds)
@@ -528,6 +544,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
 
     @core.pyqtSlot(dict)
     def on_new_data(self, stockdata):
+        """React to new stock data from the server."""
         self.waiting.hide()
         self.depot.update(stockdata)
         for sym, upd in sorted(stockdata.items()):
@@ -535,7 +552,9 @@ class Client(arguments.BaseArguments, wid.QWidget):
                 depotstock = DepotStock(sym)
                 sg = StockGraph(sym, None)
                 sw = StockWidget(sg, self.depot, depotstock)
+                sw.setParent(self)
                 self.stock_widgets[sym] = sw
+                sw.show()
                 self.add_stock_widget(sw)
                 self.depot.add_stock(sym, depotstock)
                 self.depot.priceUpdated.connect(sw.update)
