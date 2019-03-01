@@ -17,11 +17,13 @@ class Creds:
     user = ''
     password = ''
     addr = ''
+    group = ''
 
 
 class ClientConfigDialog(wid.QDialog):
     addr = None
     user = None
+    group = None
     password = None
     defaults = False
 
@@ -38,12 +40,15 @@ class ClientConfigDialog(wid.QDialog):
         self.user = wid.QLineEdit()
         self.user.readOnly = False
         self.user.setText(self.load_default('user'))
+        self.group = wid.QLineEdit()
+        self.group.readOnly = False
+        self.group.setText(self.load_default('group'))
         self.password = wid.QLineEdit()
         self.password.readOnly = False
         self.password.setText(self.load_default('password'))
         self.password.setEchoMode(wid.QLineEdit.Password)
 
-        if self.defaults and self.addr.text() and self.user.text() and self.password.text():
+        if self.defaults and self.addr.text() and self.user.text() and self.password.text() and self.group.text():
             self.finished.emit(1)
             self.accepted.emit()
             return
@@ -56,6 +61,10 @@ class ClientConfigDialog(wid.QDialog):
         hbox_user.addWidget(wid.QLabel('Username: '))
         hbox_user.addWidget(self.user)
 
+        hbox_group = wid.QHBoxLayout()
+        hbox_group.addWidget(wid.QLabel('Group: '))
+        hbox_group.addWidget(self.group)
+
         hbox_password = wid.QHBoxLayout()
         hbox_password.addWidget(wid.QLabel('Password: '))
         hbox_password.addWidget(self.password)
@@ -65,6 +74,7 @@ class ClientConfigDialog(wid.QDialog):
         ok.clicked.connect(super().done)
         vbox.addLayout(hbox_addr)
         vbox.addLayout(hbox_user)
+        vbox.addLayout(hbox_group)
         vbox.addLayout(hbox_password)
         vbox.addWidget(ok)
 
@@ -108,6 +118,7 @@ class ClientConfigDialog(wid.QDialog):
         creds.user = self.user.text()
         creds.password = self.password.text()
         creds.addr = self.addr.text()
+        creds.group = self.group.text()
         return creds
 
 
@@ -429,7 +440,13 @@ class CallbackSocket(core.QObject):
         self.try_send(summary)
 
     def wrap(self, msg):
-        return json.dumps({'_stockcallback': True, 'user': self.creds.user, 'password': self.creds.password, 'msg': msg})
+        return json.dumps({
+            '_stockcallback': True,
+            'user': self.creds.user,
+            'password': self.creds.password,
+            'group': self.creds.group,
+            'msg': msg,
+        })
 
     def try_send(self, msg):
         msg = self.wrap(msg)
