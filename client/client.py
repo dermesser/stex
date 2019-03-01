@@ -8,9 +8,7 @@ import zmq
 
 import PyQt5.QtWidgets as wid
 import PyQt5.QtCore as core
-
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
+import PyQt5.QtChart as chart
 
 class Creds:
     user = ''
@@ -68,7 +66,6 @@ class ClientConfigDialog(wid.QDialog):
 
         self.setVisible(True)
 
-
     default_addr_file = '.config/stex/'
 
     def load_default(self, id):
@@ -99,6 +96,8 @@ class ClientConfigDialog(wid.QDialog):
         self.save_default('addr', self.addr.text())
         self.save_default('user', self.user.text())
         self.save_default('password', self.password.text())
+        self.accepted.emit()
+        self.finished.emit(1)
 
     def creds(self):
         creds = Creds()
@@ -107,37 +106,49 @@ class ClientConfigDialog(wid.QDialog):
         creds.addr = self.addr.text()
         return creds
 
-class StockGraph(FigureCanvas):
-    fig = None
-    axes = None
+class StockGraph(chart.QChartView):
     sym = ''
 
     MAX_LEN = 500
     XAXIS = [i for i in range(0, MAX_LEN)]
-    history = [0 for i in range(0, MAX_LEN)]
+    # Current position in graph.
+    current = 0
+
+    series = None
+    min, max = 1e9, -1e9
 
     def __init__(self, sym, dim):
+        super().__init__()
+        super().setMinimumSize(300,300)
         self.sym = sym
-        self.fig = Figure(figsize=(dim or (200,100)), dpi=90)
-        self.axes = self.fig.add_subplot(111)
+        self.series = chart.QLineSeries(self)
+        for x in self.XAXIS:
+            self.series.append(x, 0)
 
-        super().__init__(self.fig)
-        super().setSizePolicy(wid.QSizePolicy.Expanding, wid.QSizePolicy.Expanding)
-        super().updateGeometry()
+        super().chart().setTitle(self.sym)
+        super().chart().legend().hide()
+        super().chart().addSeries(self.series)
+        super().chart().createDefaultAxes()
 
     def update_stock(self, value):
-        self.history.append(value/100)
-        self.history[0:] = self.history[1:]
+        if value < self.min:
+            self.min = value
+        if value > self.max:
+            self.max = value
+
+        previous, nxt = (self.current-1)%self.MAX_LEN, (self.current+1)%self.MAX_LEN
+        # Shift graph to the left
+        self.series.replace(self.current, self.current, value)
+
+        self.current += 1
+        if self.current >= self.MAX_LEN:
+            self.current = 0
         self.plot()
 
     def plot(self):
-        self.axes.clear()
-        self.axes.grid(True)
-        self.axes.set_xlim(0, self.MAX_LEN)
-        self.axes.set_title(self.sym)
-        self.axes.plot(self.XAXIS, self.history)
-        self.draw_idle()
-        print('DEBUG: Would have drawn')
+        super().chart().removeSeries(super().chart().series()[0])
+        super().chart().addSeries(self.series)
+        super().chart().createDefaultAxes()
 
 class StockWidget(wid.QWidget):
     graph = None
@@ -145,13 +156,10 @@ class StockWidget(wid.QWidget):
     def __init__(self, graph):
         super().__init__()
         self.graph = graph
-        graph.show()
-        #self.update(5000)
 
         mainvbox = wid.QVBoxLayout(self)
         mainvbox.addWidget(self.graph)
         mainvbox.addLayout(self.init_buttonbox())
-        self.show()
 
     def init_buttonbox(self):
         buy = wid.QPushButton('  BUY   ')
@@ -167,20 +175,20 @@ class StockWidget(wid.QWidget):
         return hbox
 
     def update(self, val):
-        print('DEBUG: Update {} with {}'.format(self.graph.sym, val))
-        self.graph.update_stock(val)
-        self.mainvbox.adjustSize()
+        self.graph.update_stock(val/100)
         self.current_state.setText('{} pc / {} ø/pc / {} ø'.format('?', val/100, val/100))
 
-class ClientSocket:
+class ClientSocket(core.QObject):
     zctx = None
     sock = None
-    callback = None
     socknot = None
 
-    def __init__(self, creds, callback):
+    on_new_message = core.pyqtSignal(dict)
+
+    def __init__(self, creds):
         """callback is a function taking received data dicts."""
-        self.callback = callback
+        super().__init__()
+
         self.zctx = zmq.Context()
         self.sock = self.zctx.socket(zmq.SUB)
         self.sock.setsockopt(zmq.IPV6, 1)
@@ -191,14 +199,14 @@ class ClientSocket:
         self.socknot = core.QSocketNotifier(fd, core.QSocketNotifier.Read)
         self.socknot.activated.connect(self.on_activated)
 
+    @core.pyqtSlot(int)
     def on_activated(self, _sock):
         try:
             while True:
                 msg = self.sock.recv_json()
-                print('DEBUG: received something')
                 if '_stockdata' not in msg:
                     return
-                self.callback(msg)
+                self.on_new_message.emit(msg)
         except Exception:
             return
 
@@ -226,32 +234,35 @@ class Client(arguments.BaseArguments, wid.QWidget):
         self.creds = creds
 
     def start_wait_window(self):
-        self.sock = ClientSocket(self.creds, self.on_new_data)
-        print('DEBUG: Started wait')
+        self.sock = ClientSocket(self.creds)
+        self.sock.on_new_message.connect(self.on_new_data)
+
+        self.start_main_window()
+        self.waiting = wid.QLabel("Waiting for incoming stock data - hang tight!", self)
+        self.mainvbox.addWidget(self.waiting)
 
     stock_widgets = {}
 
+    @core.pyqtSlot(dict)
     def on_new_data(self, stockdata):
-        print('DEBUG: ' + str(stockdata))
+        self.waiting.hide()
         for sym, val in sorted(stockdata.items()):
             if sym in self.stock_widgets:
                 self.stock_widgets[sym].update(val)
             elif sym != '_stockdata':
-                sw = StockWidget(StockGraph(sym, None))
+                sg = StockGraph(sym, None)
+                sw = StockWidget(sg)
                 self.stock_widgets[sym] = sw
                 self.add_stock_widget(sw)
 
-    main_window_active = False
     mainvbox = None
     hboxes = []
     widgets_per_hbox = 2
 
     def add_stock_widget(self, sw):
-        if not self.main_window_active:
-            self.start_main_window()
+        print(self.hboxes)
         if len(self.hboxes) == 0 or self.hboxes[-1].count() >= self.widgets_per_hbox:
             hbox = wid.QHBoxLayout()
-            sw.show()
             hbox.addWidget(sw)
             self.hboxes.append(hbox)
             self.mainvbox.addLayout(hbox)
@@ -260,7 +271,6 @@ class Client(arguments.BaseArguments, wid.QWidget):
         return
 
     def start_main_window(self):
-        print('DEBUG: started main window')
         self.mainvbox = wid.QVBoxLayout(self)
         self.main_window_active = True
         self.show()
