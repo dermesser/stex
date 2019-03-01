@@ -181,7 +181,6 @@ class Server(arguments.BaseArguments):
                     nextinterval = remaining if remaining > 0 else 0
                 else:  # Timeout
                     nextdata = self._stocks.generate()
-                    print("DEBUG: {}".format(nextdata))
                     self.pubsocket.send_string(nextdata.serialize())
                     nextinterval = interval
 
