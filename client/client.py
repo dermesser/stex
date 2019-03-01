@@ -150,6 +150,12 @@ class Depot(core.QObject):
                 self.stock[sym].update(upd)
                 self.priceUpdated.emit(sym)
 
+    def total_value(self):
+        value = 0
+        for sym, stock in self.stock.items():
+            value += stock.current_num * stock.current_price
+        return value
+
 # A stock position in a depot.
 class DepotStock:
     sym = ''
@@ -266,9 +272,9 @@ class StockWidget(wid.QWidget):
             return
         val = self.depotstock.current_price / 100
         self.graph.update_stock(val)
-        self.current_state.setText('{} pc / {} ø/pc / {} ø'.format(self.depotstock.current_num,
-                    self.depotstock.current_price, self.depotstock.current_num
-                    * self.depotstock.current_price))
+        self.current_state.setText('{} pc / {:.2f} ø/pc / {:.2f} ø'.format(self.depotstock.current_num,
+                    val, self.depotstock.current_num*val))
+
 
 class DepotWidget(wid.QWidget):
     depot = None
@@ -291,7 +297,10 @@ class DepotWidget(wid.QWidget):
 
     @core.pyqtSlot(str)
     def on_depot_update(self, sym_):
-        self.depot_value_widget.setText('{} ø'.format(self.depot.cash))
+        stock = self.depot.total_value()/100
+        cash = self.depot.cash/100
+        self.depot_value_widget.setText(
+                '{:.2f} ø = {:.2f} ø (Cash) + {:.2f} ø (Stock)'.format(stock+cash, cash, stock))
 
 class ClientSocket(core.QObject):
     zctx = None
