@@ -236,7 +236,7 @@ class StockGraph(chart.QChartView):
 
     def __init__(self, sym, dim):
         super().__init__()
-        super().setMinimumSize(300, 300)
+        super().setMinimumSize(500, 300)
         self.sym = sym
         self.series = chart.QLineSeries(self)
         self.avg_buy_series = chart.QLineSeries(self)
@@ -561,7 +561,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
         self.show()
 
         self.group_table = wid.QTableWidget(self.group_members_max, 2, self)
-        self.group_table.setBaseSize(100, 400)
+        self.group_table.setMaximumWidth(250)
         self.group_table.show()
 
         self.mainhbox.addLayout(self.stocksvbox)
@@ -596,7 +596,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
     def on_new_group_info(self, groupinfo):
         """Updates leader-board table."""
         members = groupinfo.items()
-        members = sorted(members, key=lambda i: i[1].get('value', -1))
+        members = sorted(members, key=lambda i: i[1].get('value', -1), reverse=True)
         self.group_table.clear()
         i = 0
         for (member, info) in members:
@@ -606,7 +606,6 @@ class Client(arguments.BaseArguments, wid.QWidget):
             self.group_table.setItem(i, 0, wid.QTableWidgetItem(member))
             self.group_table.setItem(i, 1, wid.QTableWidgetItem('{:.0f} ø'.format(value)))
             i += 1
-
 
     @core.pyqtSlot()
     def on_periodic_timer(self):
