@@ -177,9 +177,12 @@ class Server(arguments.BaseArguments):
                     continue
                 try:
                     msgs = sock.recv_multipart()
-                    print ('Client {:x}: {}', msgs[0], msgs[1])
-                except:
-                    continue
+                    assert len(msgs) > 2
+                    print ('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), json.loads(msgs[2].decode())))
+                    resp = {'_stockresp': True, 'ok': True}
+                    sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
+                except Exception as e:
+                    print(e)
 
 
 def main():
