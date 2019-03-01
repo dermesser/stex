@@ -177,7 +177,7 @@ class Depot(core.QObject):
         return value
 
     def to_dict(self):
-        s = {'cash': self.cash, 'value': self.total_value(), 'stock': {}, '_stockdepot': True}
+        s = {'cash': self.cash, 'value': self.cash + self.total_value(), 'stock': {}, '_stockdepot': True}
         for sym, stock in self.stock.items():
             stock_sum = {'num': stock.current_num}
             s['stock'][sym] = stock_sum
@@ -604,7 +604,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
                 break
             value = info['value'] / 100 if 'value' in info else -1
             self.group_table.setItem(i, 0, wid.QTableWidgetItem(member))
-            self.group_table.setItem(i, 1, wid.QTableWidgetItem('{} ø'.format(value)))
+            self.group_table.setItem(i, 1, wid.QTableWidgetItem('{:.0f} ø'.format(value)))
 
 
     @core.pyqtSlot()
