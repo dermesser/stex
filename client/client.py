@@ -126,11 +126,12 @@ class Depot(core.QObject):
             raise AttributeError('stock not found!')
         stock = self.stock[stocksym]
         price = stock.current_price
-        assert price > 0
+        if price == 0:
+            price = 1
         if price * num > self.cash:
             return False
         self.cash -= price * num
-        stock.current_num += num
+        stock.change_hold(num)
         return True
 
     def sell(self, stocksym, num):
@@ -138,11 +139,10 @@ class Depot(core.QObject):
             raise AttributeError('stock not found!')
         stock = self.stock[stocksym]
         price = stock.current_price
-        assert price > 0
         if num > stock.current_num:
             return False
         self.cash += price * num
-        stock.current_num -= num
+        stock.change_hold(-num)
         return True
 
     def update(self, message):
@@ -172,6 +172,7 @@ class DepotStock:
     mydepot = None
 
     current_price = -1
+    total_buy_price = 0
     current_num = 0
     MAXHIST = 500
     price_history = []
@@ -188,9 +189,21 @@ class DepotStock:
         if upd['split']:
             self.current_num = self.current_num * 2
 
+    def change_hold(self, diff):
+        self.current_num += diff
+        if diff > 0:
+            self.total_buy_price += diff * self.current_price
+        if diff < 0:
+            self.total_buy_price += diff * self.avg_buy_price()
+
+    def avg_buy_price(self):
+        return self.total_buy_price / (self.current_num or 1)
+
 
 class StockGraph(chart.QChartView):
     sym = ''
+    # Updated by StockWidget
+    avg_buy_price = 0
 
     MAX_LEN = 500
     XAXIS = [i for i in range(0, MAX_LEN)]
@@ -198,30 +211,45 @@ class StockGraph(chart.QChartView):
     current = 0
 
     series = None
-    min, max = 1e9, -1e9
+    avg_buy_series = None
+    upd_series = None
 
     def __init__(self, sym, dim):
         super().__init__()
         super().setMinimumSize(300, 200)
         self.sym = sym
         self.series = chart.QLineSeries(self)
+        self.avg_buy_series = chart.QLineSeries(self)
+        self.upd_series = chart.QLineSeries(self)
+
         for x in self.XAXIS:
             self.series.append(x, 0)
 
         super().chart().setTitle(self.sym)
         super().chart().legend().hide()
         super().chart().addSeries(self.series)
+        super().chart().addSeries(self.avg_buy_series)
+        super().chart().addSeries(self.upd_series)
         super().chart().createDefaultAxes()
 
     def update_stock(self, value):
-        if value < self.min:
-            self.min = value
-        if value > self.max:
-            self.max = value
+        min, max = 1e9, -1e9
+        for v in self.series.pointsVector():
+            if v.y() < min:
+                min = v.y()
+            if v.y() > max:
+                max = v.y()
 
         previous, nxt = (self.current - 1) % self.MAX_LEN, (self.current + 1) % self.MAX_LEN
         self.series.replace(self.current, self.current, value)
-        self.series.replace(nxt, nxt, 0)
+
+        self.upd_series.clear()
+        self.upd_series.append(self.current, 0)
+        self.upd_series.append(self.current, max)
+
+        self.avg_buy_series.clear()
+        self.avg_buy_series.append(0, self.avg_buy_price)
+        self.avg_buy_series.append(self.MAX_LEN - 1, self.avg_buy_price)
 
         self.current += 1
         if self.current >= self.MAX_LEN:
@@ -229,7 +257,10 @@ class StockGraph(chart.QChartView):
         self.plot()
 
     def plot(self):
-        super().chart().removeSeries(super().chart().series()[0])
+        while super().chart().series():
+            super().chart().removeSeries(super().chart().series()[0])
+        super().chart().addSeries(self.upd_series)
+        super().chart().addSeries(self.avg_buy_series)
         super().chart().addSeries(self.series)
         super().chart().createDefaultAxes()
 
@@ -287,6 +318,7 @@ class StockWidget(wid.QWidget):
 
     def update_values(self):
         val = self.depotstock.current_price / 100
+        self.graph.avg_buy_price = self.depotstock.avg_buy_price() / 100
         self.current_state.setText('{} pc / {:.2f} ø/pc / {:.2f} ø'.format(self.depotstock.current_num, val, self.depotstock.current_num * val))
 
 
