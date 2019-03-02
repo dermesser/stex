@@ -195,6 +195,7 @@ class Server(arguments.BaseArguments):
 
                     custom_msg = msg.get('msg', '')
                     groupinfo = {'cash': custom_msg.get('cash', -1), 'value': custom_msg.get('value', -1)}
+
                     _groups.update(msg.get('group', None), msg.get('user', None), groupinfo)
                     resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
                     sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
