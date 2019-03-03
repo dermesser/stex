@@ -15,6 +15,15 @@ _maxinitvalue = 10000
 _splitvalue = 20000
 _maxhistory = 100
 
+class Log:
+    def __init__(self, file=sys.stderr):
+        self.out = file
+
+    def log(self, *kwargs):
+        print(*kwargs, file=self.out, flush=True)
+
+LOG = None
+
 class Groups:
     """Groups manages depot subscriptions for groups."""
     groups = {}
@@ -23,7 +32,7 @@ class Groups:
         """updates user info in a group. info is a dict containing the fields 'cash'."""
         if not (group and user and info):
             return
-        print('updated ', group, user, info)
+        LOG.log('updated ', group, user, info)
         self.groups[group] = {} if group not in self.groups else self.groups[group]
         self.groups[group][user] = info
 
@@ -123,6 +132,7 @@ class Server(arguments.BaseArguments):
         --stocks=<stocks>       Number of stocks to generate.
         --stocklist=<stocks>    List of ticker symbols to generate stocks for.
         --interval=<interval>   Interval in ms to publish stock data (default 500)
+        --log=<file>            Log file.
         --help                  Print help.
     """
 
@@ -131,6 +141,7 @@ class Server(arguments.BaseArguments):
         def __init__(self, zctx, callback=None):
             """callback is called with a StockData object every time new data are available."""
             super(arguments.BaseArguments, self).__init__(doc=self._doc)
+            self.setup_log()
             if self.help or None:
                 print(self._doc)
                 sys.exit(0)
@@ -148,6 +159,18 @@ class Server(arguments.BaseArguments):
             pubsocket.bind('tcp://{}:{}'.format(self.address or '[::]', port))
             self.pubsocket = pubsocket
             self.init_stocks()
+
+        def setup_log(self):
+            if self.log is not None:
+                # Attempt to create file if it doesn't exist.
+                try:
+                    with open(self.log, mode='x') as f:
+                        pass
+                except:
+                    pass
+                log = open(self.log, mode='a')
+                global LOG
+                LOG = Log(log)
 
         def init_stocks(self):
             stocklist = []
@@ -191,7 +214,7 @@ class Server(arguments.BaseArguments):
                     msgs = sock.recv_multipart()
                     assert len(msgs) > 2
                     msg = json.loads(msgs[2].decode())
-                    print ('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
+                    LOG.log('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
 
                     custom_msg = msg.get('msg', '')
                     groupinfo = {'cash': custom_msg.get('cash', -1), 'value': custom_msg.get('value', -1)}
