@@ -216,14 +216,19 @@ class Server(arguments.BaseArguments):
                     msg = json.loads(msgs[2].decode())
                     LOG.log('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
 
-                    custom_msg = msg.get('msg', '')
-                    groupinfo = {'cash': custom_msg.get('cash', -1), 'value': custom_msg.get('value', -1)}
-
-                    _groups.update(msg.get('group', None), msg.get('user', None), groupinfo)
-                    resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
+                    custom_msg = msg.get('msg', {})
+                    self.handle_message(custom_msg)
                     sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
                 except Exception as e:
                     raise e
+
+        def handle_message(self, message):
+            if '_stocklogin' in message:
+                pass
+            if '_stockdepot' in message:
+                groupinfo = {'cash': custom_msg.get('cash', -1), 'value': custom_msg.get('value', -1)}
+                _groups.update(msg.get('group', None), msg.get('user', None), groupinfo)
+                resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
 
 def main():
         ctx = zmq.Context()

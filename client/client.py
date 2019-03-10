@@ -202,6 +202,8 @@ class DepotStock:
         upd is a stock update message.
         """
         self.current_price = upd['price']
+        if 'qty' in upd:
+            self.current_num = upd['qty']
         if upd['split']:
             self.current_num = self.current_num * 2
 
@@ -454,21 +456,27 @@ class CallbackSocket(core.QObject):
 
     def send_depot(self, depot):
         summary = depot.to_dict()
-        if not self.try_send(summary):
-            self.queue.pop(0)
+        # Don't attempt to send if something's already waiting.
+        self.try_send(summary, permanent=False)
 
-    def wrap(self, msg):
+    def send_order(self, order):
+        """order should contain the keys 'symbol', 'qty'."""
+        order['type'] = 'order'
+        self.try_send(order, permanent=True)
+
+    def wrap(self, msg, type):
         return json.dumps({
             '_stockcallback': True,
             'user': self.creds.user,
             'password': self.creds.password,
             'group': self.creds.group,
+            'type': type,
             'msg': msg,
         })
 
-    def try_send(self, msg):
-        msg = self.wrap(msg)
-        if self.waiting:
+    def try_send(self, msg, permanent=True):
+        msg = self.wrap(msg, msg.get('type', 'callback'))
+        if self.waiting and permanent:
             self.queue.append(msg)
         else:
             try:
@@ -477,7 +485,8 @@ class CallbackSocket(core.QObject):
                 return True
             except Exception as e:
                 print ('DEBUG: Send failed on REQ socket: ', e)
-                self.queue.append(msg)
+                if permanent:
+                    self.queue.append(msg)
         assert len(self.queue) < 5
         return False
 
