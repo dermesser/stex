@@ -553,14 +553,17 @@ class Client(arguments.BaseArguments, wid.QWidget):
     group_table = None
 
     def add_stock_widget(self, sw):
-        if len(self.stockrows) == 0 or self.stockrows[-1].count() >= self.widgets_per_hbox:
-            hbox = wid.QHBoxLayout()
-            hbox.addWidget(sw)
-            self.stockrows.append(hbox)
-            self.stocksvbox.addLayout(hbox)
+        dst_hbox = None
+        if len(self.stockrows) == 0 or not any([r.count() < self.widgets_per_hbox for r in self.stockrows]):
+            dst_hbox = wid.QHBoxLayout()
+            self.stockrows.append(dst_hbox)
+            self.stocksvbox.addLayout(dst_hbox)
         else:
-            self.stockrows[-1].addWidget(sw)
-        return
+            for hb in self.stockrows:
+                if hb.count() < self.widgets_per_hbox:
+                    dst_hbox = hb
+        assert dst_hbox is not None
+        dst_hbox.addWidget(sw)
 
     def start_wait_window(self):
         self.mainhbox = wid.QHBoxLayout(self)
@@ -592,6 +595,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
         """React to new stock data from the server."""
         self.waiting.hide()
         self.depot.update(stockdata)
+
         for sym, upd in sorted(stockdata.items()):
             if sym != '_stockdata' and sym not in self.stock_widgets:
                 depotstock = DepotStock(sym)
