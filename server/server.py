@@ -51,6 +51,8 @@ class Stock:
         # Random walk coefficients
         _stddev = 0
 
+        BANKRUPCY_LIMIT = 1000
+
         def name():
             """Generates a stock-ticker-like name."""
             return ''.join([chr(int(_random.random() * 26) + 0x41) for i in range(0, 4)])
@@ -59,11 +61,12 @@ class Stock:
             self.symbol = name
             self._stddev = _random.random() / 10
             self._current_value = _random.random() * _maxinitvalue
+            self._last_values.append(self._current_value)
 
         def next_price(self):
             """Calculates a (random) next price based on the current price and history. Returns a dict suitable for inclusion in a _stockdata object."""
             dev = 0.02 * self._current_value or 1
-            new_value = int(_random.normalvariate(self._current_value * 1.0005, dev))
+            new_value = int(_random.normalvariate(self._current_value * 0.9, dev))
             new_value = abs(new_value)
             split = False
 
@@ -71,8 +74,8 @@ class Stock:
                 new_value = new_value / 2
                 split = True
 
-            self._last_values.append(self._current_value)
             self._current_value = new_value
+            self._last_values.append(self._current_value)
             if len(self._last_values) > _maxhistory:
                 self._last_values = self._last_values[1:]
 
@@ -80,6 +83,10 @@ class Stock:
 
         def current_value(self):
             return self._current_value
+
+        def is_bankrupt(self):
+            """Returns True if this stock is bankrupt."""
+            return (sum(self._last_values)/len(self._last_values) < self.BANKRUPCY_LIMIT)
 
 
 class StockData:
@@ -115,9 +122,12 @@ class Stocks:
 
         def generate(self):
             next = {}
-            for s in self._stocks:
-                nextprice = s.next_price()
-                next[s.symbol] = nextprice
+            for i in range(0, len(self._stocks)):
+                s = self._stocks[i]
+                if s.is_bankrupt():
+                    self._stocks[i] = Stock(Stock.name())
+                    s = self._stocks[i]
+                next[s.symbol] = s.next_price()
             return StockData(next)
 
 
