@@ -66,7 +66,7 @@ class Stock:
         def next_price(self):
             """Calculates a (random) next price based on the current price and history. Returns a dict suitable for inclusion in a _stockdata object."""
             dev = 0.02 * self._current_value or 1
-            new_value = int(_random.normalvariate(self._current_value * 0.9, dev))
+            new_value = int(_random.normalvariate(self._current_value * 1.0005, dev))
             new_value = abs(new_value)
             split = False
 
