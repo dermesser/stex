@@ -135,6 +135,10 @@ class Depot(core.QObject):
         if stocksym not in self.stock:
             self.stock[stocksym] = stock
 
+    def remove_stock(self, stocksym):
+        if stocksym in self.stock:
+            self.stock.pop(stocksym)
+
     def buy(self, stocksym, num):
         if stocksym not in self.stock:
             raise AttributeError('stock not found!')
@@ -554,6 +558,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
 
     def add_stock_widget(self, sw):
         dst_hbox = None
+        # Check if there are any hboxes we can add the widget to, otherwise create new hbox.
         if len(self.stockrows) == 0 or not any([r.count() < self.widgets_per_hbox for r in self.stockrows]):
             dst_hbox = wid.QHBoxLayout()
             self.stockrows.append(dst_hbox)
@@ -596,20 +601,31 @@ class Client(arguments.BaseArguments, wid.QWidget):
         self.waiting.hide()
         self.depot.update(stockdata)
 
+        # Hide widget and remove from depot
+        to_remove = []
+        for sym, wid in self.stock_widgets.items():
+            if sym not in stockdata:
+                print("{} bankrupt!".format(sym))
+                wid.hide()
+                for r in self.stockrows:
+                    r.removeWidget(wid)
+                to_remove.append(sym)
+        for s in to_remove:
+            self.stock_widgets.pop(s)
+            self.depot.remove_stock(s)
+
         for sym, upd in sorted(stockdata.items()):
             if sym != '_stockdata' and sym not in self.stock_widgets:
                 depotstock = DepotStock(sym)
                 sg = StockGraph(sym, None)
                 sw = StockWidget(sg, self.depot, depotstock)
+                sw.setObjectName(sym)
                 sw.setParent(self)
                 self.stock_widgets[sym] = sw
                 sw.show()
                 self.add_stock_widget(sw)
                 self.depot.add_stock(sym, depotstock)
                 self.depot.priceUpdated.connect(sw.update)
-        for sym, wid in self.stock_widgets.items():
-            if sym not in stockdata:
-                wid.hide()
 
     @core.pyqtSlot(dict)
     def on_new_group_info(self, groupinfo):
@@ -628,7 +644,6 @@ class Client(arguments.BaseArguments, wid.QWidget):
 
     @core.pyqtSlot()
     def on_periodic_timer(self):
-        print('DEBUG: timer expired!')
         if not self.callback_sock:
             return
         self.callback_sock.send_depot(self.depot)
