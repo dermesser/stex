@@ -171,6 +171,8 @@ class Server(arguments.BaseArguments):
                 log = open(self.log, mode='a')
                 global LOG
                 LOG = Log(log)
+            else:
+                LOG = Log()
 
         def init_stocks(self):
             stocklist = []
@@ -204,9 +206,10 @@ class Server(arguments.BaseArguments):
                     self.pubsocket.send_string(nextdata.serialize())
                     nextinterval = interval
 
+        groups = Groups()
+
         # Handle callbacks from clients.
         def handle_calls(self, events):
-            # TODO
             for (sock, ev) in events:
                 if not (ev | zmq.POLLIN):
                     continue
@@ -217,19 +220,19 @@ class Server(arguments.BaseArguments):
                     LOG.log('Client {}: {} {}'.format(msgs[0].hex(), msgs[1].decode(), msg))
 
                     custom_msg = msg.get('msg', {})
-                    self.handle_message(custom_msg)
+                    resp = self.handle_message(msg['user'], msg['group'], msg['password'], custom_msg)
                     sock.send_multipart([msgs[0], msgs[1], bytes(json.dumps(resp), 'utf-8')])
                 except Exception as e:
                     raise e
 
-        def handle_message(self, message):
+        def handle_message(self, user, group, password, message):
+            """Returns the complete response to send to a client."""
             if '_stocklogin' in message:
-                pass
+                return {}
             if '_stockdepot' in message:
-                groupinfo = {'cash': custom_msg.get('cash', -1), 'value': custom_msg.get('value', -1)}
-                _groups.update(msg.get('group', None), msg.get('user', None), groupinfo)
-                resp = {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(msg.get('group'))}
-
+                groupinfo = {'cash': message.get('cash', -1), 'value': message.get('value', -1)}
+                _groups.update(group, user, groupinfo)
+                return {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(group)}
 def main():
         ctx = zmq.Context()
         s = Server(ctx)

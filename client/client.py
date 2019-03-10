@@ -603,6 +603,9 @@ class Client(arguments.BaseArguments, wid.QWidget):
                 self.add_stock_widget(sw)
                 self.depot.add_stock(sym, depotstock)
                 self.depot.priceUpdated.connect(sw.update)
+        for sym, wid in self.stock_widgets.items():
+            if sym not in stockdata:
+                wid.hide()
 
     @core.pyqtSlot(dict)
     def on_new_group_info(self, groupinfo):
