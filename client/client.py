@@ -518,6 +518,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
 
     Options
         --defaults      Use cached defaults if available.
+        --help          Show help.
     """
 
     creds = Creds()
@@ -531,6 +532,10 @@ class Client(arguments.BaseArguments, wid.QWidget):
         super(wid.QWidget, self).__init__()
         wid.QWidget.setMinimumSize(self, 1000, 700)
         super(arguments.BaseArguments, self).__init__(doc=self._doc)
+        
+        if self.help is not None:
+            print(self._doc)
+            exit(0)
 
         self.depot_widget = DepotWidget(self.depot)
         self.depot.cash = 1000000
