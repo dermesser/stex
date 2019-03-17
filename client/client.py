@@ -533,7 +533,7 @@ class Client(arguments.BaseArguments, wid.QWidget):
         wid.QWidget.setMinimumSize(self, 1000, 700)
         super(arguments.BaseArguments, self).__init__(doc=self._doc)
         
-        if self.help is not None:
+        if self.help:
             print(self._doc)
             exit(0)
 
