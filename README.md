@@ -1,7 +1,7 @@
 # stex
 
 stex (**st**ock **ex**change) is another stock market simulator game like there have been many of before. This one
-featGures client/server mode in which several clients can play on identical, synchronous stock exchange data (randomly
+features client/server mode in which several clients can play on identical, synchronous stock exchange data (randomly
 generated, just to be clear). More features are planned, but as of now, clients will already see the wealth of
 other players in the same group in their game window.
 
@@ -16,6 +16,11 @@ $ pipenv shell
 $$ client/client.py --help # and
 $$ server/server.py --help
 ```
+
+# Screenshot
+
+![screenshot.png](A screenshot of Stex running with 6 stocks and no other
+players.)
 
 # Usage
 
