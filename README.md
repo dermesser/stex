@@ -19,8 +19,7 @@ $$ server/server.py --help
 
 # Screenshot
 
-![screenshot.png](A screenshot of Stex running with 6 stocks and no other
-players.)
+![](screenshot.png)
 
 # Usage
 
