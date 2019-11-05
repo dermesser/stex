@@ -7,12 +7,15 @@ other players in the same group in their game window.
 
 # Dependencies
 
-These can be installed via `pip3` or your system's package manager:
+stex is not fully pipified, you can use it somewhat conveniently with pipenv
+though:
 
-* `PyQt5` (>= 5.11)
-* `PyQtChart`
-* `pyzmq`
-* `arguments`
+```
+$ pipenv install
+$ pipenv shell
+$$ client/client.py --help # and
+$$ server/server.py --help
+```
 
 # Usage
 
