@@ -445,9 +445,7 @@ class CallbackSocket(core.QObject):
         socket.setsockopt(zmq.RCVTIMEO, 0)
         socket.setsockopt(zmq.SNDTIMEO, 10)
         
-        u = url.urlparse(creds.addr)
-        hostport = u.netloc or u.path
-        (host, _, port) = hostport.partition(':')
+        (host, _, port) = creds.addr.partition(':')
         socket.connect('tcp://{}:{}'.format(host, int(port if port else '9988') + 1))
         self.socket = socket
 

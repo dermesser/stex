@@ -160,7 +160,7 @@ class Server(arguments.BaseArguments):
 
             interactivesocket = zctx.socket(zmq.ROUTER)
             interactivesocket.setsockopt(zmq.IPV6, 1)
-            interactivesocket.bind('tcp://{}:{}'.format(self.address or '[::]', int(port) + 1 if self.port else '9989'))
+            interactivesocket.bind('tcp://{}:{}'.format(self.address or '[::]', int(port) + 1 if self.port else 9989))
             interactivesocket.setsockopt(zmq.RCVTIMEO, 0)
             self.interactivesocket = interactivesocket
 
@@ -205,7 +205,6 @@ class Server(arguments.BaseArguments):
             while True:
                 before = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
                 events = p.poll(nextinterval)
-
                 if len(events) > 0:
                     self.handle_calls(events)
                     diff = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) - before) / 1e6
@@ -243,6 +242,7 @@ class Server(arguments.BaseArguments):
                 groupinfo = {'cash': message.get('cash', -1), 'value': message.get('value', -1)}
                 _groups.update(group, user, groupinfo)
                 return {'_stockresp': True, 'ok': True, 'groupinfo': _groups.get(group)}
+
 def main():
         ctx = zmq.Context()
         s = Server(ctx)
