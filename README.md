@@ -31,3 +31,8 @@ On any client, run `client/client.py`. You can again use `--help` for an overvie
 will store the information you enter in the client window so that you don't have to enter them every time. Note that
 the `Password` is not used anywhere so far -- it is meaningless. `Group` determines whose wealth numbers you see, so if
 you play with others you should choose the same group name here.
+
+## Notes
+
+On FreeBSD: Use `*` as server address, as binding to IPs doesn't seem to work in
+all cases.
