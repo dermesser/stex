@@ -8,7 +8,7 @@ verify_ssl = true
 [packages]
 PyQt5 = "==5.13"
 PyQtChart = "==5.13"
-PyYAML = "==5.1"
+PyYAML = "==5.4"
 arguments = "==76"
 consoleprinter = "==93"
 future = "==0.17"
