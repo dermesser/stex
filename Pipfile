@@ -11,7 +11,7 @@ PyQtChart = "==5.13"
 PyYAML = "==5.4"
 arguments = "==76"
 consoleprinter = "==93"
-future = "==0.17"
+future = "==0.18.3"
 pyzmq = "==17"
 
 [requires]
